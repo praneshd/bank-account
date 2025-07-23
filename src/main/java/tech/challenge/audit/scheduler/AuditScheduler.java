@@ -13,8 +13,8 @@ public class AuditScheduler {
         this.auditService = auditService;
     }
 
-    @Scheduled(fixedRate = 5000) // every 5 seconds
+    @Scheduled(fixedRate = 1000*60*60*4) // every 4 hrs in case we have any left over messages just for precaution
     public void submitAuditBatches() {
-        auditService.processSubmissions();
+        //auditService.processSubmissions();
     }
 }

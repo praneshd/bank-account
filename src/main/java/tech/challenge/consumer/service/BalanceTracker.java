@@ -4,6 +4,7 @@ package tech.challenge.consumer.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import tech.challenge.audit.service.AuditService;
 import tech.challenge.audit.service.ScoringBasedAuditService;
 import tech.challenge.domain.Transaction;
 import tech.challenge.exception.InvalidTransactionException;
@@ -15,22 +16,21 @@ import java.util.concurrent.atomic.AtomicLong;
 @Service
 public class BalanceTracker implements BankAccountService {
     //Storing long to avoid floating-point errors
-    private final ScoringBasedAuditService auditService;
+    private final AuditService auditService;
     private final AtomicLong balanceInPence = new AtomicLong(0);
 
-    public BalanceTracker(ScoringBasedAuditService auditService) {
+    public BalanceTracker(AuditService auditService) {
         this.auditService = auditService;
     }
 
     @Override
     public void processTransaction(Transaction transaction) {
         Optional.ofNullable(transaction)
-                .filter(t -> t.getAmount() != 0.0)
                 .ifPresentOrElse(
                         tx -> {
                             long amountInPence = Math.round(tx.getAmount() * 100);
                             long updated = balanceInPence.addAndGet(amountInPence);
-                            auditService.acceptTransaction(transaction);
+                            auditService.processTransaction(transaction);
                             log.info("Processed transaction {}. New balance: {} pence", tx.getId(), updated);
                         },
                         () -> {

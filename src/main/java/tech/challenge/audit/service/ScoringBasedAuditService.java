@@ -9,15 +9,12 @@ import tech.challenge.audit.submission.SubmissionHandler;
 import tech.challenge.domain.Transaction;
 import tech.challenge.exception.AuditTransactionProcessingException;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.*;
+import java.util.concurrent.*;
 
 @Slf4j
 @Service
-public class ScoringBasedAuditService {
+public class ScoringBasedAuditService implements AuditService {
 
     @Value("${audit.max.transactions.per.submission:1000}")
     private int maxTransactionsPerSubmission;
@@ -25,33 +22,55 @@ public class ScoringBasedAuditService {
     @Value("${audit.max.batch.total.value:1000000.0}")
     private double maxBatchTotalValue;
 
-    private final BlockingQueue<Transaction> transactionQueue = new LinkedBlockingQueue<>();
     private final SubmissionHandler submissionHandler;
+    private final BlockingQueue<Transaction> transactionQueue;
+    private final ExecutorService executorService;
+    private final Semaphore semaphore;
 
-    public ScoringBasedAuditService(SubmissionHandler submissionHandler) {
+    public ScoringBasedAuditService(SubmissionHandler submissionHandler, @Value("${audit.thread.pool.size:4}") int threadPoolSize) {
         this.submissionHandler = submissionHandler;
+        this.transactionQueue = new LinkedBlockingQueue<>();
+        this.executorService = Executors.newFixedThreadPool(threadPoolSize);
+        this.semaphore = new Semaphore(threadPoolSize);
     }
 
-    public void acceptTransaction(Transaction transaction) {
+
+    @Override
+    public void processTransaction(Transaction transaction) {
         try {
             transactionQueue.put(transaction);
+            if (transactionQueue.size() >= maxTransactionsPerSubmission) {
+                triggerProcessing();
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new AuditTransactionProcessingException("Failed to accept transaction in audit service", e);
+            throw new AuditTransactionProcessingException("Failed to enqueue transaction", e);
         }
     }
 
-    public void processSubmissions() {
+    private void triggerProcessing() {
+        if (semaphore.tryAcquire()) {
+            executorService.submit(() -> {
+                try {
+                    processSubmissions();
+                } finally {
+                    semaphore.release();
+                }
+            });
+        } else {
+            log.debug("All processing threads are currently busy. Waiting for a slot...");
+        }
+    }
+
+    private  void processSubmissions() {
         List<Transaction> drainedTransactions = new ArrayList<>();
         transactionQueue.drainTo(drainedTransactions, maxTransactionsPerSubmission);
 
         if (drainedTransactions.isEmpty()) {
             return;
         }
-        log.info("Pulled {} transactions for efficient batching", drainedTransactions.size());
 
         List<Batch> batches = new ArrayList<>();
-
         drainedTransactions.forEach(tx -> {
 
             double value = Math.abs(tx.getAmount());
@@ -90,21 +109,4 @@ public class ScoringBasedAuditService {
     }
 
 
-    /*private Optional<Batch> getBatch1(List<Batch> batches, double value) {
-        Batch bestBatch = null;
-        double smallestRemainingCapacity = Double.MAX_VALUE;
-
-        for (Batch batch : batches) {
-            double remainingCapacity = maxBatchTotalValue - batch.getTotalValue();
-            if (value <= remainingCapacity) {
-                double adjustedCapacity = remainingCapacity - value;
-                if (adjustedCapacity < smallestRemainingCapacity) {
-                    smallestRemainingCapacity = adjustedCapacity;
-                    bestBatch = batch;
-                }
-            }
-        }
-
-        return Optional.ofNullable(bestBatch);
-    }*/
 }

@@ -5,18 +5,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import tech.challenge.audit.service.ScoringBasedAuditService;
+import tech.challenge.audit.service.AuditService;
 import tech.challenge.domain.Transaction;
 import tech.challenge.exception.InvalidTransactionException;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class BalanceTrackerTest {
 
     @Mock
-    private ScoringBasedAuditService auditService;
+    private AuditService  auditService;
 
     @InjectMocks
     private BalanceTracker balanceTracker;
@@ -31,7 +32,7 @@ class BalanceTrackerTest {
         balanceTracker.processTransaction(tx);
 
         assertThat(balanceTracker.retrieveBalance()).isEqualTo(25.50);
-        verify(auditService).acceptTransaction(tx);
+        verify(auditService).processTransaction(tx);
     }
 
     @Test
@@ -43,20 +44,10 @@ class BalanceTrackerTest {
         balanceTracker.processTransaction(tx2);
 
         assertThat(balanceTracker.retrieveBalance()).isEqualTo(30.00);
-        verify(auditService).acceptTransaction(tx1);
-        verify(auditService).acceptTransaction(tx2);
+        verify(auditService).processTransaction(tx1);
+        verify(auditService).processTransaction(tx2);
     }
 
-    @Test
-    void test_givenZeroAmountTransaction_thenThrowInvalidTransactionException() {
-        Transaction tx = Transaction.builder().id("tx4").amount(0.0).build();
-
-        assertThatThrownBy(() -> balanceTracker.processTransaction(tx))
-                .isInstanceOf(InvalidTransactionException.class)
-                .hasMessageContaining("zero amount");
-
-        verifyNoInteractions(auditService);
-    }
 
     @Test
     void test_givenNullTransaction_thenThrowInvalidTransactionException() {
@@ -79,7 +70,7 @@ class BalanceTrackerTest {
         balanceTracker.processTransaction(Transaction.builder().id("tx7").amount(-5.00).build());
 
         assertThat(balanceTracker.retrieveBalance()).isEqualTo(25.00);
-        verify(auditService, times(3)).acceptTransaction(any());
+        verify(auditService, times(3)).processTransaction(any());
     }
 
     @Test
@@ -88,16 +79,14 @@ class BalanceTrackerTest {
 
         balanceTracker.processTransaction(tx);
 
-        verify(auditService, times(1)).acceptTransaction(tx);
+        verify(auditService, times(1)).processTransaction(tx);
     }
 
     @Test
     void test_givenInvalidTransactions_thenAuditServiceNotCalled() {
-        Transaction tx1 = Transaction.builder().id("tx9").amount(0.0).build();
+
         Transaction tx2 = null;
 
-        assertThatThrownBy(() -> balanceTracker.processTransaction(tx1))
-                .isInstanceOf(InvalidTransactionException.class);
 
         assertThatThrownBy(() -> balanceTracker.processTransaction(tx2))
                 .isInstanceOf(InvalidTransactionException.class);
