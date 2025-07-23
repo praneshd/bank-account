@@ -113,53 +113,42 @@ mvn test
 
 - Audit submission scheduling
 
-## Assumptions
-- No Overdraft Enforcement:
-Account balances are allowed to go negative. There is no overdraft limit or warning. All debit transactions are processed regardless of balance.
+## **Assumptions and Limitations**
 
-- Transaction Amount Representation:
-Amounts are stored in pence (integer values) to prevent floating-point precision errors.
-Credits are positive values, and debits are negative values.
-- Batching Logic:
-A batch can contain up to 1000 transactions.
-The total value of a batch cannot exceed £1,000,000 (i.e., 100,000,000 pence).
-Transactions that would breach the batch limit are skipped with a warning log.
+### **No Overdraft Enforcement**
+- Account balances are allowed to go negative.
+- There is no overdraft limit or warning.
+- All debit transactions are processed regardless of balance.
 
-- Thread Safety:
-The transaction queue (LinkedBlockingQueue) is thread-safe.
-A Semaphore is used to limit the number of concurrent batch processing threads.
-A custom ExecutorService is used to manage thread execution safely.
+### **Transaction Amount Representation**
+- Amounts are stored in **pence (integer values)** to avoid floating-point precision issues.
+- **Credits** are positive values; **debits** are negative values.
 
-- Asynchronous Processing Trigger:
-There is no scheduled batching.
-When the queue reaches the threshold (e.g., 1000 transactions), processing is triggered immediately on a new thread (if available).
+### **Batching Logic**
+- A batch can contain up to **1000 transactions**.
+- The total value of a batch cannot exceed **£1,000,000** (i.e., 100,000,000 pence).
+- Transactions that would breach the batch total limit are **skipped** with a warning log.
 
-- Submission Processing Failures:
-Any exceptions during submission handling are logged.
-There is no automatic retry mechanism for failed submissions.
+### **Thread Safety**
+- The transaction queue is a **thread-safe LinkedBlockingQueue**.
+- A **Semaphore** limits the number of concurrent batch processing threads.
+- A custom **ExecutorService** manages thread execution.
 
-- Transaction Ordering:
-Transactions are processed in FIFO order from the queue.
-Due to parallel execution, batch submission order is not guaranteed.
+### **Asynchronous Processing Trigger**
+- **No scheduled batching** is used.
+- When the queue reaches the threshold (e.g., 1000 transactions), processing is **immediately triggered** on a new thread (if available).
 
-- No Persistent Storage:
-The system maintains all state in memory.
-Data is not persisted across application restarts.
+### **Submission Processing Failures**
+- Any exceptions during submission handling are **logged**.
+- **No retry mechanism** is currently in place for failed submissions.
 
-## Limitations
-- No Retry or Dead Letter Queue:
-Failed batch submissions are logged but not retried or saved for future processing.
+### **Transaction Ordering**
+- Transactions are dequeued and processed in **FIFO (first-in-first-out)** order.
+- **Batch submission order is not guaranteed** due to concurrent processing.
 
-- No Backpressure or Throttling:
-The system doesn't support explicit backpressure or rate limiting for transaction ingestion.
+### **No Persistent Storage**
+- All application state is held **in memory**.
+- Data will be **lost** on application shutdown or restart.
 
-- Non-deterministic Batch Assignment:
-As batching is multi-threaded, the grouping of transactions into batches may vary per run.
-
-- Oversized Transactions Are Ignored:
-Any single transaction exceeding the batch total limit is skipped and not re-queued.
-
-## Configuration
-Thread Pool Size:
-The number of audit worker threads for batch processing is configurable via application properties (e.g., audit.thread.pool.size).
-This allows tuning for different load conditions or deployment environments
+### **Thread Pool Configuration**
+- The number of concurrent processing threads is **configurable** via application properties:
