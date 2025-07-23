@@ -7,24 +7,24 @@ import tech.challenge.domain.Transaction;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import java.util.Random;
 import java.util.concurrent.*;
+import java.util.function.Supplier;
 
 @Slf4j
 @Component
 public class TransactionProducer {
 
-    private static final double MIN_AMOUNT = 200;
-    private static final double MAX_AMOUNT = 500_000;
-
     private final BankAccountService bankAccountService;
     private final ScheduledExecutorService creditExecutor;
     private final ScheduledExecutorService debitExecutor;
-    private final Random random;
+    private final Supplier<Double> randomSupplier;
 
-    public TransactionProducer(BankAccountService bankAccountService, Random random) {
+    private static final double MIN = 200;
+    private static final double MAX = 500_000;
+
+    public TransactionProducer(BankAccountService bankAccountService, Supplier<Double> randomSupplier) {
         this.bankAccountService = bankAccountService;
-        this.random = random;
+        this.randomSupplier = randomSupplier;
         this.creditExecutor = Executors.newSingleThreadScheduledExecutor();
         this.debitExecutor = Executors.newSingleThreadScheduledExecutor();
     }
@@ -34,6 +34,10 @@ public class TransactionProducer {
         creditExecutor.scheduleAtFixedRate(this::produceCredit, 0, 40, TimeUnit.MILLISECONDS);
         debitExecutor.scheduleAtFixedRate(this::produceDebit, 0, 40, TimeUnit.MILLISECONDS);
         log.info("TransactionProducer started with dedicated threads for credits and debits.");
+    }
+
+    private double getRandomAmount() {
+        return MIN + (MAX - MIN) * randomSupplier.get(); // randomSupplier.get() should return [0.0, 1.0)
     }
 
     private void produceCredit() {
@@ -56,10 +60,6 @@ public class TransactionProducer {
         } catch (Exception e) {
             log.error("Error generating debit transaction", e);
         }
-    }
-
-    double getRandomAmount() {
-        return MIN_AMOUNT + (MAX_AMOUNT - MIN_AMOUNT) * random.nextDouble();
     }
 
     @PreDestroy

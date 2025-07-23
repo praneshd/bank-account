@@ -4,12 +4,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.Random;
+import java.util.function.Supplier;
 
 @Configuration
 public class ApplicationBeanConfig {
 
     @Bean
-    public Random random() {
-        return new Random(); // real random in production
+    public Supplier<Double> randomDoubleSupplier() {
+        return () -> new Random().nextDouble(); // [0.0, 1.0)
     }
 }

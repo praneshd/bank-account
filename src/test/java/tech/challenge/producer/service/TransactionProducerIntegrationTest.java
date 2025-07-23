@@ -1,5 +1,6 @@
 package tech.challenge.producer.service;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -9,6 +10,7 @@ import tech.challenge.domain.Transaction;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -19,42 +21,52 @@ class TransactionProducerIntegrationTest {
     @Mock
     private BankAccountService bankAccountService;
 
-    @InjectMocks
-    private TransactionProducer transactionProducer;
-
     @Captor
     private ArgumentCaptor<Transaction> transactionCaptor;
 
+    private TransactionProducer transactionProducer;
+
+    private final Supplier<Double> fixedRandomSupplier = () -> 0.5; // deterministic value
+
+    @AfterEach
+    void tearDown() {
+        if (transactionProducer != null) {
+            transactionProducer.stop();
+        }
+    }
+
     @Test
-    void test_givenProducerStarted_thenCreditAndDebitAreProducedUsingLatch() throws InterruptedException {
-        // Expecting 2 transactions (1 credit + 1 debit)
+    void test_givenFixedRandomSupplier_thenCreditAndDebitHaveExpectedAmounts() throws InterruptedException {
+        // Arrange
         CountDownLatch latch = new CountDownLatch(2);
 
-        // Wrap mock to count down latch on each call
         doAnswer(invocation -> {
             latch.countDown();
             return null;
         }).when(bankAccountService).processTransaction(any(Transaction.class));
 
-        transactionProducer.start();
+        transactionProducer = new TransactionProducer(bankAccountService, fixedRandomSupplier);
 
-        // Wait up to 1 second for both credit and debit to be processed
+        // Act
+        transactionProducer.start();
         boolean completed = latch.await(1, TimeUnit.SECONDS);
 
-        // Ensure both transactions processed
+        // Assert
         assertThat(completed).isTrue();
 
-        // Capture and assert both types of transactions (credit: amount > 0, debit: amount < 0)
         verify(bankAccountService, atLeast(2)).processTransaction(transactionCaptor.capture());
 
-        boolean hasCredit = transactionCaptor.getAllValues().stream().anyMatch(tx -> tx.getAmount() > 200
-                && tx.getAmount() < 500_000  );
-        boolean hasDebit = transactionCaptor.getAllValues().stream().anyMatch(tx -> tx.getAmount() < -200
-                && tx.getAmount() > -500_000);
+        double expectedAmount = 200 + (500_000 - 200) * 0.5; // based on supplier
+        double expectedCredit = expectedAmount;
+        double expectedDebit = -expectedAmount;
 
-        assertThat(hasCredit).isTrue();
-        assertThat(hasDebit).isTrue();
+        boolean hasExpectedCredit = transactionCaptor.getAllValues().stream()
+                .anyMatch(tx -> tx.getAmount() == expectedCredit);
 
-        transactionProducer.stop();
+        boolean hasExpectedDebit = transactionCaptor.getAllValues().stream()
+                .anyMatch(tx -> tx.getAmount() == expectedDebit);
+
+        assertThat(hasExpectedCredit).isTrue();
+        assertThat(hasExpectedDebit).isTrue();
     }
 }
