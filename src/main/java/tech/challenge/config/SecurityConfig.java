@@ -13,36 +13,60 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * Configuration class for Spring Security.
+ * Defines security-related beans and configurations for the application.
+ */
 @Configuration
-@EnableMethodSecurity(prePostEnabled = true) // Updated annotation
+@EnableMethodSecurity(prePostEnabled = true) // Enables method-level security annotations
 public class SecurityConfig {
 
+    /**
+     * Configures the security filter chain for HTTP requests.
+     * Disables CSRF protection, configures authorization rules, and enables HTTP Basic authentication.
+     *
+     * @param http the HttpSecurity object to configure
+     * @return the configured SecurityFilterChain
+     * @throws Exception if an error occurs during configuration
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable)
+                .csrf(AbstractHttpConfigurer::disable) // Disables CSRF protection
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/balance").authenticated()
-                        .anyRequest().permitAll()
+                        .requestMatchers("/api/v1/balance").authenticated() // Requires authentication for specific endpoints
+                        .anyRequest().permitAll() // Allows all other requests
                 )
-                .httpBasic(httpBasic -> {});
+                .httpBasic(httpBasic -> {}); // Enables HTTP Basic authentication
 
         return http.build();
     }
 
+    /**
+     * Configures an in-memory user details service with a single user.
+     * The user has a username, an encoded password, and a role.
+     *
+     * @return the configured UserDetailsService
+     */
     @Bean
     public UserDetailsService userDetailsService() {
         UserDetails user = User.builder()
-                .username("test")
-                .password(passwordEncoder().encode("p@ssword12")) // Securely encode the password
-                .roles("USER")
+                .username("test") // Sets the username
+                .password(passwordEncoder().encode("p@ssword12")) // Encodes the password securely
+                .roles("USER") // Assigns the role "USER"
                 .build();
 
         return new InMemoryUserDetailsManager(user);
     }
 
+    /**
+     * Configures a password encoder using BCrypt.
+     * BCrypt is a strong hashing algorithm for secure password storage.
+     *
+     * @return the configured PasswordEncoder
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(); // Use BCrypt for secure password encoding
+        return new BCryptPasswordEncoder();
     }
 }

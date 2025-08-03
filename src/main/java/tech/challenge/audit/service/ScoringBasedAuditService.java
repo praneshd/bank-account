@@ -12,13 +12,25 @@ import tech.challenge.exception.AuditTransactionProcessingException;
 import java.util.*;
 import java.util.concurrent.*;
 
+/**
+ * Service implementation for auditing transactions using a scoring-based approach.
+ * Handles transaction batching and submission to a `SubmissionHandler` for processing.
+ */
 @Slf4j
 @Service
-public class ScoringBasedAuditService implements AuditService {
+class ScoringBasedAuditService implements AuditService {
 
+    /**
+     * Maximum number of transactions allowed per submission.
+     * Configurable via the `audit.max.transactions.per.submission` property.
+     */
     @Value("${audit.max.transactions.per.submission:1000}")
     private int maxTransactionsPerSubmission;
 
+    /**
+     * Maximum total value allowed for a batch of transactions.
+     * Configurable via the `audit.max.batch.total.value` property.
+     */
     @Value("${audit.max.batch.total.value:1000000.0}")
     private double maxBatchTotalValue;
 
@@ -27,6 +39,12 @@ public class ScoringBasedAuditService implements AuditService {
     private final ExecutorService executorService;
     private final Semaphore semaphore;
 
+    /**
+     * Constructor for `ScoringBasedAuditService`.
+     *
+     * @param submissionHandler the handler responsible for processing submissions
+     * @param threadPoolSize the size of the thread pool for processing transactions
+     */
     public ScoringBasedAuditService(SubmissionHandler submissionHandler, @Value("${audit.thread.pool.size:4}") int threadPoolSize) {
         this.submissionHandler = submissionHandler;
         this.transactionQueue = new LinkedBlockingQueue<>();
@@ -34,7 +52,13 @@ public class ScoringBasedAuditService implements AuditService {
         this.semaphore = new Semaphore(threadPoolSize);
     }
 
-
+    /**
+     * Processes a single transaction by adding it to the transaction queue.
+     * If the queue size reaches the maximum allowed transactions per submission, triggers processing.
+     *
+     * @param transaction the transaction to process
+     * @throws AuditTransactionProcessingException if the transaction cannot be enqueued
+     */
     @Override
     public void processTransaction(Transaction transaction) {
         try {
@@ -48,6 +72,9 @@ public class ScoringBasedAuditService implements AuditService {
         }
     }
 
+    /**
+     * Triggers the processing of transactions in the queue if a thread is available.
+     */
     private void triggerProcessing() {
         if (semaphore.tryAcquire()) {
             executorService.submit(() -> {
@@ -62,7 +89,7 @@ public class ScoringBasedAuditService implements AuditService {
         }
     }
 
-    private  void processSubmissions() {
+    private void processSubmissions() {
         List<Transaction> drainedTransactions = new ArrayList<>();
         transactionQueue.drainTo(drainedTransactions, maxTransactionsPerSubmission);
 
@@ -72,7 +99,6 @@ public class ScoringBasedAuditService implements AuditService {
 
         List<Batch> batches = new ArrayList<>();
         drainedTransactions.forEach(tx -> {
-
             double value = Math.abs(tx.getAmount());
             if (value > maxBatchTotalValue) {
                 log.warn("Transaction value {} exceeds max allowed batch total {}", value, maxBatchTotalValue);
@@ -98,6 +124,7 @@ public class ScoringBasedAuditService implements AuditService {
             submissionHandler.handle(submission);
     }
 
+
     private Optional<Batch> getBatch(List<Batch> batches, double value) {
         return batches.stream()
                 .filter(batch -> value <= (maxBatchTotalValue - batch.getTotalValue()))
@@ -107,6 +134,4 @@ public class ScoringBasedAuditService implements AuditService {
                     return Double.compare(remainingCapacity1, remainingCapacity2);
                 });
     }
-
-
 }

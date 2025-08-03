@@ -1,6 +1,7 @@
 package tech.challenge.producer.service;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -36,8 +37,9 @@ class TransactionProducerIntegrationTest {
     }
 
     @Test
-    void test_givenFixedRandomSupplier_thenCreditAndDebitHaveExpectedAmounts() throws InterruptedException {
-        // Arrange
+    @DisplayName("Given a fixed random supplier, when transactions are produced, then credit and debit have expected amounts")
+    void testGivenFixedRandomSupplierThenCreditAndDebitHaveExpectedAmounts() throws InterruptedException {
+        // Given
         CountDownLatch latch = new CountDownLatch(2);
 
         doAnswer(invocation -> {
@@ -47,11 +49,11 @@ class TransactionProducerIntegrationTest {
 
         transactionProducer = new TransactionProducer(bankAccountService, fixedRandomSupplier);
 
-        // Act
+        // When
         transactionProducer.start();
         boolean completed = latch.await(1, TimeUnit.SECONDS);
 
-        // Assert
+        // Then
         assertThat(completed).isTrue();
 
         verify(bankAccountService, atLeast(2)).processTransaction(transactionCaptor.capture());

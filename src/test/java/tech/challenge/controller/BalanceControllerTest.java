@@ -1,6 +1,7 @@
 package tech.challenge.controller;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -35,12 +36,13 @@ class BalanceControllerTest {
     }
 
     @Test
-    void test_getBalance_success() throws Exception {
-        // Arrange
+    @DisplayName("Given a valid balance retrieval, when the endpoint is called, then it returns the balance successfully")
+    void testGetBalanceSuccess() throws Exception {
+        // Given
         double mockBalance = 1000.0;
         when(bankAccountService.retrieveBalance()).thenReturn(mockBalance);
 
-        // Act & Assert
+        // When & Then
         mockMvc.perform(get("/api/v1/balance")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -51,11 +53,12 @@ class BalanceControllerTest {
     }
 
     @Test
-    void test_getBalance_runtimeException() throws Exception {
-        // Arrange
+    @DisplayName("Given a runtime exception during balance retrieval, when the endpoint is called, then it returns an internal server error")
+    void testGetBalanceRuntimeException() throws Exception {
+        // Given
         when(bankAccountService.retrieveBalance()).thenThrow(new RuntimeException("Service error"));
 
-        // Act & Assert
+        // When & Then
         mockMvc.perform(get("/api/v1/balance")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isInternalServerError())
