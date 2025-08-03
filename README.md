@@ -113,4 +113,42 @@ mvn test
 
 - Audit submission scheduling
 
+## **Assumptions and Limitations**
 
+### **No Overdraft Enforcement**
+- Account balances are allowed to go negative.
+- There is no overdraft limit or warning.
+- All debit transactions are processed regardless of balance.
+
+### **Transaction Amount Representation**
+- Amounts are stored in **pence (integer values)** to avoid floating-point precision issues.
+- **Credits** are positive values; **debits** are negative values.
+
+### **Batching Logic**
+- A batch can contain up to **1000 transactions**.
+- The total value of a batch cannot exceed **£1,000,000** (i.e., 100,000,000 pence).
+- Transactions that would breach the batch total limit are **skipped** with a warning log.
+
+### **Thread Safety**
+- The transaction queue is a **thread-safe LinkedBlockingQueue**.
+- A **Semaphore** limits the number of concurrent batch processing threads.
+- A custom **ExecutorService** manages thread execution.
+
+### **Asynchronous Processing Trigger**
+- **No scheduled batching** is used.
+- When the queue reaches the threshold (e.g., 1000 transactions), processing is **immediately triggered** on a new thread (if available).
+
+### **Submission Processing Failures**
+- Any exceptions during submission handling are **logged**.
+- **No retry mechanism** is currently in place for failed submissions.
+
+### **Transaction Ordering**
+- Transactions are dequeued and processed in **FIFO (first-in-first-out)** order.
+- **Batch submission order is not guaranteed** due to concurrent processing.
+
+### **No Persistent Storage**
+- All application state is held **in memory**.
+- Data will be **lost** on application shutdown or restart.
+
+### **Thread Pool Configuration**
+- The number of concurrent processing threads is **configurable** via application properties:
