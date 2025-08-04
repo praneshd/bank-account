@@ -62,10 +62,12 @@ class TransactionProducerIntegrationTest {
         double expectedDebit = -expectedAmount;
 
         boolean hasExpectedCredit = transactionCaptor.getAllValues().stream()
-                .anyMatch(tx -> tx.getAmount() == expectedAmount);
+                .filter(transaction -> transaction.getAmount() > 0 )
+                .allMatch(tx -> tx.getAmount() == expectedAmount);
 
         boolean hasExpectedDebit = transactionCaptor.getAllValues().stream()
-                .anyMatch(tx -> tx.getAmount() == expectedDebit);
+                .filter(transaction -> transaction.getAmount() < 0  )
+                .allMatch(tx -> tx.getAmount() == expectedDebit);
 
         assertThat(hasExpectedCredit).isTrue();
         assertThat(hasExpectedDebit).isTrue();

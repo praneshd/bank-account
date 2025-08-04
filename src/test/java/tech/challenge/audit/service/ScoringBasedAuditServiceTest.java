@@ -75,7 +75,7 @@ class ScoringBasedAuditServiceTest {
     }
 
     @Test
-    @DisplayName("Given 4 transactions per batch with max value 100 and 4 workers, should create 4 batches")
+    @DisplayName("Given 4 transactions per batch with max value 100 and 4 workers, should create 4 submission")
     void shouldCreate4BatchesFor4TransactionsPerBatchWithMaxValue100And4Workers() throws InterruptedException {
         // Given
         double[] transactionAmounts = {12, 34, 1, 45, -4, -30, -40, 45, 25, -45, 65, -11, 5, 75, 25, -62};

@@ -146,6 +146,7 @@ class ScoringBasedAuditService implements AuditService {
 
     private void handleSubmission(Submission submission) {
         if (!submission.getBatches().isEmpty()) {
+            log.info("Handling submission: {}", submission);
             submissionHandler.handle(submission);
         }
     }
