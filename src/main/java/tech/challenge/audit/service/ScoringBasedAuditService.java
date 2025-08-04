@@ -14,7 +14,7 @@ import java.util.concurrent.*;
 
 /**
  * Service implementation for auditing transactions using a scoring-based approach.
- * Handles transaction batching and submission to a `SubmissionHandler` for processing.
+ * Handles transaction batching and submission to a <class>SubmissionHandler</class> for processing.
  */
 @Slf4j
 @Service
@@ -77,54 +77,55 @@ class ScoringBasedAuditService implements AuditService {
      */
     private void triggerProcessing() {
         if (semaphore.tryAcquire()) {
-            executorService.submit(() -> {
-                try {
-                    processSubmissions();
-                } finally {
-                    semaphore.release();
-                }
-            });
+            CompletableFuture.supplyAsync(this::buildBatches, executorService)
+                    .thenApply(this::buildSubmission)
+                    .thenAccept(this::handleSubmission)
+                    .whenComplete((result, throwable) -> semaphore.release());
         } else {
             log.debug("All processing threads are currently busy. Waiting for a slot...");
         }
     }
 
-    private void processSubmissions() {
+    private List<Batch> buildBatches() {
         List<Transaction> drainedTransactions = new ArrayList<>();
         transactionQueue.drainTo(drainedTransactions, maxTransactionsPerSubmission);
 
         if (drainedTransactions.isEmpty()) {
-            return;
+            return Collections.emptyList();
         }
 
-        List<Batch> batches = new ArrayList<>();
-        drainedTransactions.forEach(tx -> {
-            double value = Math.abs(tx.getAmount());
-            if (value > maxBatchTotalValue) {
-                log.warn("Transaction value {} exceeds max allowed batch total {}", value, maxBatchTotalValue);
-                // Option 1: skip this transaction
-                return;
-                // Option 2: handle separately, e.g., send to overflow queue
-            }
-
-            getBatch(batches, value)
-                    .filter(batch -> batch.getTransactionCount() < maxTransactionsPerSubmission)
-                    .ifPresentOrElse(
-                            batch -> batch.addTransaction(value),
-                            () -> batches.add(Batch.builder()
-                                    .transactionCount(1)
-                                    .totalValue(value)
-                                    .build())
-                    );
-        });
-
-        Submission submission = Submission.builder().batches(batches).build();
-
-        if (!submission.getBatches().isEmpty())
-            submissionHandler.handle(submission);
+        return drainedTransactions.stream()
+                .filter(tx -> isTransactionWithinRange(Math.abs(tx.getAmount())))
+                .collect(
+                        ArrayList::new,
+                        this::processTransactionForBatch,
+                        ArrayList::addAll
+                );
     }
 
 
+    private boolean isTransactionWithinRange(double value) {
+        if (value > maxBatchTotalValue) {
+            log.warn("Transaction value {} exceeds max allowed batch total {}", value, maxBatchTotalValue);
+            return false; // Skip this transaction
+        }
+        return true;
+    }
+
+    //Create new batch or add it to existing batch
+    private void processTransactionForBatch(List<Batch> batches, Transaction tx) {
+        double value = Math.abs(tx.getAmount());
+        getBatch(batches, value)
+                .ifPresentOrElse(
+                        batch -> batch.addTransaction(value),
+                        () -> batches.add(Batch.builder()
+                                .transactionCount(1)
+                                .totalValue(value)
+                                .build())
+                );
+    }
+
+    //Goes through each batch and assigns the value to the batch where it fits appropriately.
     private Optional<Batch> getBatch(List<Batch> batches, double value) {
         return batches.stream()
                 .filter(batch -> value <= (maxBatchTotalValue - batch.getTotalValue()))
@@ -134,4 +135,17 @@ class ScoringBasedAuditService implements AuditService {
                     return Double.compare(remainingCapacity1, remainingCapacity2);
                 });
     }
+
+    private Submission buildSubmission(List<Batch> batches) {
+        return Submission.builder().batches(batches).build();
+    }
+
+    private void handleSubmission(Submission submission) {
+        if (!submission.getBatches().isEmpty()) {
+            submissionHandler.handle(submission);
+        }
+    }
+
+
+
 }

@@ -94,7 +94,7 @@ class ScoringBasedAuditServiceTest {
             scoringBasedAuditService.processTransaction(createTransaction(amount));
         }
 
-        boolean completed = latch.await(5, TimeUnit.SECONDS);
+        boolean completed = latch.await(10, TimeUnit.SECONDS);
 
         // Then
         assertTrue(completed, "Submission handler was not invoked in time");

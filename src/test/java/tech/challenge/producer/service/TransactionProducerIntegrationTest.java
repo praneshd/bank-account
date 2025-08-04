@@ -59,11 +59,10 @@ class TransactionProducerIntegrationTest {
         verify(bankAccountService, atLeast(2)).processTransaction(transactionCaptor.capture());
 
         double expectedAmount = 200 + (500_000 - 200) * 0.5; // based on supplier
-        double expectedCredit = expectedAmount;
         double expectedDebit = -expectedAmount;
 
         boolean hasExpectedCredit = transactionCaptor.getAllValues().stream()
-                .anyMatch(tx -> tx.getAmount() == expectedCredit);
+                .anyMatch(tx -> tx.getAmount() == expectedAmount);
 
         boolean hasExpectedDebit = transactionCaptor.getAllValues().stream()
                 .anyMatch(tx -> tx.getAmount() == expectedDebit);
