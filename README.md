@@ -78,11 +78,11 @@ Consists of two flows:
 
 ## 📊 Batch Optimization Comparison
 
-| Strategy        | 1,000 Txns | Avg Batch Size | 100,000 Txns | Avg Batch Size |
-|-----------------|------------|----------------|--------------|----------------|
-| Best Fit        | ✅         | 250            | ✅           | 250,000        |
-| First Fit       | ✅         | 245            | ✅           | 250,000        |
-| **Scoring-Based** | ✅       | 240            | ✅           | **250,000**    |
+| Strategy        | 1,000 Batch Size |  100,000 Avg Batch Size |
+|-----------------|------------       |--------------          |
+| Best Fit        | 250               | 250,000        |
+| First Fit       | 245               | 250,000        |
+| **Scoring-Based** | 240             | **250,000**    |
 
 > 🔍 **Scoring-Based** was selected for production due to lower memory and CPU overheads, despite slightly smaller batch size in low-volume cases.
 
